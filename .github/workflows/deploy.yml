@@ -1,0 +1,76 @@
+name: CI/CD - Build, Push to Docker Hub and Deploy to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/discover-dollar-backend:latest
+      FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/discover-dollar-frontend:latest
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Login to Docker Hub
+      - name: Log in to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # 3. Build backend image
+      - name: Build backend image
+        run: |
+          docker build \
+            -t $BACKEND_IMAGE \
+            ./backend
+
+      # 4. Build frontend image
+      - name: Build frontend image
+        run: |
+          docker build \
+            -t $FRONTEND_IMAGE \
+            ./frontend
+
+      # 5. Push backend image
+      - name: Push backend image
+        run: |
+          docker push $BACKEND_IMAGE
+
+      # 6. Push frontend image
+      - name: Push frontend image
+        run: |
+          docker push $FRONTEND_IMAGE
+
+      # 7. Setup SSH key
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.HOST_IP }}" >> ~/.ssh/known_hosts
+
+      # 8. Deploy on EC2 (pull latest images & restart containers)
+      - name: Deploy to EC2 via SSH
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.HOST_IP }} << 'EOF'
+            set -e
+
+            # Go to project directory (assumes you've already cloned it here)
+            cd ~/discover-dollar-devops-mean-task
+
+            # Pull latest code
+            git pull
+
+            # Pull latest images from Docker Hub
+            sudo docker-compose -f docker-compose.prod.yml pull
+
+            # Recreate containers with new images
+            sudo docker-compose -f docker-compose.prod.yml up -d
+
+          EOF
