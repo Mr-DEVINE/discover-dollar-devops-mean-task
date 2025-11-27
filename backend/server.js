@@ -1,7 +1,12 @@
 const express = require("express");
-//const cors = require("cors");
+const cors = require("cors");
 
 const app = express();
+
+// Allow requests from Angular dev server
+app.use(cors({
+  origin: "http://localhost:8081"
+}));
 
 // parse requests of content-type - application/json
 app.use(express.json());
@@ -28,6 +33,7 @@ app.get("/", (req, res) => {
   res.json({ message: "Welcome to Test application." });
 });
 
+// API routes
 require("./app/routes/turorial.routes")(app);
 
 // set port, listen for requests
