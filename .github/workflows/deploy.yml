@@ -55,22 +55,22 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${{ secrets.HOST_IP }}" >> ~/.ssh/known_hosts
 
-      # 8. Deploy on EC2 (pull latest images & restart containers)
+      # 8. Deploy on EC2 (recreate containers cleanly)
       - name: Deploy to EC2 via SSH
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.HOST_IP }} << 'EOF'
             set -e
 
-            # Go to project directory (assumes you've already cloned it here)
             cd ~/discover-dollar-devops-mean-task
-
-            # Pull latest code
             git pull
+
+            # Stop and remove old containers (keeps named volumes)
+            sudo docker-compose -f docker-compose.prod.yml down
 
             # Pull latest images from Docker Hub
             sudo docker-compose -f docker-compose.prod.yml pull
 
             # Recreate containers with new images
-            sudo docker-compose -f docker-compose.prod.yml up -d
+            sudo docker-compose -f docker-compose.prod.yml up -d --remove-orphans
 
           EOF
