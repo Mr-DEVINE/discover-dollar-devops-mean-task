@@ -285,38 +285,6 @@ sudo docker-compose -f docker-compose.prod.yml up -d --remove-orphans
 
 ---
 
-# 🔟 Required Screenshots (as per assignment)
-
-You must include these in your submission:
-
-### ✅ 1. CI/CD Pipeline
-
-* GitHub Actions workflow run
-* Build logs
-* Deployment logs
-
-### ✅ 2. Docker Build & Push
-
-* Local or CI logs showing images created
-* Docker Hub repository screenshot
-
-### ✅ 3. Application Deployment
-
-* EC2 instance running `docker-compose.ps`
-* Logs from backend
-* Browser showing working UI on port 80
-
-### ✅ 4. Nginx Setup
-
-* `/etc/nginx/sites-available/discover-dollar` config screenshot
-* Nginx reload success message
-
-### ✅ 5. Infrastructure
-
-* AWS EC2 instance page
-* Security groups (port 80 open)
-
----
 
 # 🎯 Final Output
 
@@ -338,12 +306,9 @@ Complete MEAN application with:
 
 # 🎉 End of Documentation
 
-This completes your Discover Dollar DevOps Engineer Intern assignment.
-To submit: include this README + GitHub repo link + screenshots.
-
 # 📷 Screenshots
 
-Below are the screenshots required for submission. Replace the file paths with your uploaded images when adding them to GitHub.
+Below are the screenshots required for submission. 
 
 ### 1. Add Tutorial Page
 
@@ -367,5 +332,5 @@ Below are the screenshots required for submission. Replace the file paths with y
 
 ### 6. CI/CD Detailed Success View
 
-![CI/CD Success Details]("./Screenshots/CI_CD Success.png")
+![CI/CD Success Detailss](./Screenshots/CI_CD_Success.png") 
 ![CI/CD build-and-deploy]("./Screenshots/build-and-deploy.png")
