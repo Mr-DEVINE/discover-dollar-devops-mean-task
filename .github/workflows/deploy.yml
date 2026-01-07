@@ -1,76 +1,68 @@
-name: CI/CD - Build, Push to Docker Hub and Deploy to EC2
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: {}
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
-
-    env:
-      BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/discover-dollar-backend:latest
-      FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/discover-dollar-frontend:latest
-
     steps:
-      # 1. Checkout repo
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      # 2. Login to Docker Hub
-      - name: Log in to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 3. Build backend image
-      - name: Build backend image
-        run: |
-          docker build \
-            -t $BACKEND_IMAGE \
-            ./backend
+      - name: Build and Push Backend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/mean-backend:latest
 
-      # 4. Build frontend image
-      - name: Build frontend image
-        run: |
-          docker build \
-            -t $FRONTEND_IMAGE \
-            ./frontend
+      - name: Build and Push Frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/mean-frontend:latest
 
-      # 5. Push backend image
-      - name: Push backend image
-        run: |
-          docker push $BACKEND_IMAGE
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      # 6. Push frontend image
-      - name: Push frontend image
-        run: |
-          docker push $FRONTEND_IMAGE
+      - name: Copy Config Files to VM
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # CHANGE: Copy the folder 'nginx' (not the file) to ensure directory structure is created
+          source: "docker-compose.yml,nginx"
+          target: "~/"
 
-      # 7. Setup SSH key
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.HOST_IP }}" >> ~/.ssh/known_hosts
-
-      # 8. Deploy on EC2 (recreate containers cleanly)
-      - name: Deploy to EC2 via SSH
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.HOST_IP }} << 'EOF'
-            set -e
-
-            cd ~/discover-dollar-devops-mean-task
-            git pull
-
-            # Stop and remove old containers (keeps named volumes)
-            sudo docker-compose -f docker-compose.prod.yml down
-
-            # Pull latest images from Docker Hub
-            sudo docker-compose -f docker-compose.prod.yml pull
-
-            # Recreate containers with new images
-            sudo docker-compose -f docker-compose.prod.yml up -d --remove-orphans
-
-          EOF
+      - name: Deploy on VM
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Safety Check: Remove directory if it was created incorrectly by Docker previously
+            if [ -d "nginx/nginx.conf" ]; then rm -rf nginx/nginx.conf; fi
+            
+            # Stop any running containers
+            sudo docker-compose down || true
+            
+            # Pull the new images
+            sudo docker-compose pull
+            
+            # Start everything up
+            sudo docker-compose up -d
