@@ -1,37 +1,61 @@
-version: "3.8"
+version: '3.8'
 
 services:
+  # Database Service
   mongo:
-    image: mongo:6
-    container_name: dd-mongo
-    restart: unless-stopped
+    image: mongo:latest
+    container_name: mean-mongo
+    restart: always
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      - mongo-data:/data/db
+    networks:
+      - mean-network
 
+  # Backend Service
   backend:
-    build: ./backend
-    container_name: dd-backend
-    restart: unless-stopped
-    environment:
-      # Using Docker network hostname "mongo"
-      - MONGO_URL=mongodb://mongo:27017/bezkoder_db
-      - PORT=8080
+    # WE CHANGED THIS: Use 'image' instead of 'build'
+    image: mrdevine/mean-backend:latest  # <--- Make sure 'mrdevine' is your Docker Hub ID
+    container_name: mean-backend
+    restart: always
     ports:
       - "8080:8080"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/mean-db
+      - PORT=8080
     depends_on:
       - mongo
+    networks:
+      - mean-network
 
+  # Frontend Service
   frontend:
-    build: ./frontend
-    container_name: dd-frontend
-    restart: unless-stopped
-    # Nginx serves on port 80 inside container; map 8081 outside
+    # WE CHANGED THIS: Use 'image' instead of 'build'
+    image: mrdevine/mean-frontend:latest # <--- Make sure 'mrdevine' is your Docker Hub ID
+    container_name: mean-frontend
+    restart: always
+    networks:
+      - mean-network
+
+  # Nginx Reverse Proxy Service
+  nginx:
+    image: nginx:alpine
+    container_name: mean-nginx
+    restart: always
     ports:
-      - "8081:80"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
     depends_on:
+      - frontend
       - backend
+    networks:
+      - mean-network
 
 volumes:
-  mongo_data:
+  mongo-data:
+
+networks:
+  mean-network:
+    driver: bridge
